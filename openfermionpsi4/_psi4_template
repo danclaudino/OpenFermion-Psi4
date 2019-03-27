@@ -23,6 +23,7 @@ molecule = MolecularData(&geometry,
                          '&basis',
                          &multiplicity,
                          &charge,
+                         '&reference',
                          _description,
                           filename='&mol_filename')
 
@@ -39,7 +40,7 @@ if molecule.multiplicity == 1:
     set reference rhf
     set guess sad
 else:
-    set reference rohf
+    #set reference rohf
     set guess gwh
 
 # Set global parameters of calculation.
@@ -59,6 +60,7 @@ set globals {
     e_convergence 1e-6
     ints_tolerance EQUALITY_TOLERANCE
     damping_percentage 0
+    reference &reference 
 }
 
 # Run self-consistent field (SCF) calculation.
@@ -235,4 +237,48 @@ if &run_ccsd:
 
         molecule.ccsd_single_amps = single_cc_amplitudes
         molecule.ccsd_double_amps = double_cc_amplitudes
+        molecule.save()
+
+# Perform Brueckner coupled cluster doubles (BCCD) calculation.
+if &run_bccd:
+    set qc_module ccenergy
+    try:
+        bccd_energy = energy('bccd')
+        if &verbose:
+            print('BCCD energy for {} ({} electrons) is {}.'.format(
+                molecule.name, molecule.n_electrons, bccd_energy))
+    except:
+        if &tolerate_error:
+            print('WARNING: BCCD calculation failed.')
+        else:
+            raise
+    else:
+        molecule.bccd_energy = bccd_energy
+
+        # Merge CC amplitudes into molecule by parsing
+        psi_filename = outfile_name()
+        single_cc_amplitudes, double_cc_amplitudes = (
+            parse_psi4_ccsd_amplitudes(
+                2 * molecule.n_orbitals,
+                molecule.get_n_alpha_electrons(),
+                molecule.get_n_beta_electrons(),
+                psi_filename))
+
+        molecule.bccd_single_amps = single_cc_amplitudes
+        molecule.bccd_double_amps = double_cc_amplitudes
+
+        # Get integrals using MintsHelper.
+        # Integrals are overwritten because of Bruckener rotation.
+        mints = MintsHelper(hf_wavefunction.basisset())
+        molecule.one_body_integrals = general_basis_change(
+            numpy.asarray(mints.ao_kinetic()), molecule.canonical_orbitals, (1, 0))
+        molecule.one_body_integrals += general_basis_change(
+            numpy.asarray(mints.ao_potential()), molecule.canonical_orbitals, (1, 0))
+        two_body_integrals = numpy.asarray(mints.ao_eri())
+        two_body_integrals.reshape((molecule.n_orbitals, molecule.n_orbitals,
+                                    molecule.n_orbitals, molecule.n_orbitals))
+        two_body_integrals = numpy.einsum('psqr', two_body_integrals)
+        two_body_integrals = general_basis_change(
+            two_body_integrals, molecule.canonical_orbitals, (1, 1, 0, 0))
+        molecule.two_body_integrals = two_body_integrals
         molecule.save()

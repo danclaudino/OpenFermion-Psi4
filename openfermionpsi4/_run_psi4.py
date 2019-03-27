@@ -55,6 +55,7 @@ def generate_psi4_input(molecule,
                         run_mp2,
                         run_cisd,
                         run_ccsd,
+                        run_bccd,
                         run_fci,
                         verbose,
                         tolerate_error,
@@ -68,6 +69,7 @@ def generate_psi4_input(molecule,
         run_mp2: Boolean to run MP2 calculation.
         run_cisd: Boolean to run CISD calculation.
         run_ccsd: Boolean to run CCSD calculation.
+        run_bccd: Boolean to run Brueckner CCD calculation and use Brueckner orbitals.
         run_fci: Boolean to FCI calculation.
         verbose: Boolean whether to print calculation results to screen.
         tolerate_error: Whether to fail or merely warn when Psi4 fails.
@@ -105,6 +107,8 @@ def generate_psi4_input(molecule,
                      for line in input_content]
     input_content = [re.sub('&multiplicity', str(molecule.multiplicity), line)
                      for line in input_content]
+    input_content = [re.sub('&reference', molecule.reference, line)
+                     for line in input_content]
     input_content = [re.sub('&description', str(molecule.description), line)
                      for line in input_content]
     input_content = [re.sub('&mol_filename', str(molecule.filename), line)
@@ -120,6 +124,8 @@ def generate_psi4_input(molecule,
     input_content = [re.sub('&run_cisd', str(run_cisd), line)
                      for line in input_content]
     input_content = [re.sub('&run_ccsd', str(run_ccsd), line)
+                     for line in input_content]
+    input_content = [re.sub('&run_bccd', str(run_bccd), line)
                      for line in input_content]
     input_content = [re.sub('&run_fci', str(run_fci), line)
                      for line in input_content]
@@ -162,6 +168,7 @@ def run_psi4(molecule,
              run_mp2=False,
              run_cisd=False,
              run_ccsd=False,
+             run_bccd=False,
              run_fci=False,
              verbose=False,
              tolerate_error=False,
@@ -177,6 +184,7 @@ def run_psi4(molecule,
         run_mp2: Optional boolean to run MP2 calculation.
         run_cisd: Optional boolean to run CISD calculation.
         run_ccsd: Optional boolean to run CCSD calculation.
+        run_bccd: Optional boolean to run Brueckner CCD calculation and use Brueckner orbitals.
         run_fci: Optional boolean to FCI calculation.
         verbose: Boolean whether to print calculation results to screen.
         tolerate_error: Optional boolean to warn or raise when Psi4 fails.
@@ -197,6 +205,7 @@ def run_psi4(molecule,
                                      run_mp2,
                                      run_cisd,
                                      run_ccsd,
+                                     run_bccd,
                                      run_fci,
                                      verbose,
                                      tolerate_error,
