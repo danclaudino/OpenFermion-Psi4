@@ -24,6 +24,7 @@ molecule = MolecularData(&geometry,
                          &multiplicity,
                          &charge,
                          '&reference',
+                         '&hf_stability',
                          _description,
                           filename='&mol_filename')
 
@@ -55,12 +56,13 @@ set globals {
     scf_type pk
     maxiter 1e6
     num_amps_print 1e6
-    r_convergence 1e-6
-    d_convergence 1e-6
-    e_convergence 1e-6
+    r_convergence 1e-10
+    d_convergence 1e-10
+    e_convergence 1e-10
     ints_tolerance EQUALITY_TOLERANCE
     damping_percentage 0
     reference &reference 
+    stability_analysis &hf_stability
 }
 
 # Run self-consistent field (SCF) calculation.
@@ -162,8 +164,27 @@ if &run_cisd:
         # Store 1-RDM in molecule file, 2-RDM separately in other file.
         molecule.cisd_one_rdm = cisd_one_rdm
         molecule.cisd_two_rdm = cisd_two_rdm
-        molecule.save()
 
+        if &cisd_no:
+            # Get integrals using MintsHelper.
+            mints = MintsHelper(hf_wavefunction.basisset())
+            nat_occ, nat_orb = numpy.linalg.eigh(cisd_one_rdm_a)
+            nat_occ[::-1].sort()
+            nat_orb = nat_orb[::-1]
+            molecule.canonical_orbitals = molecule.canonical_orbitals @ nat_orb
+            molecule.one_body_integrals = general_basis_change(
+                numpy.asarray(mints.ao_kinetic()), molecule.canonical_orbitals, (1, 0))
+            molecule.one_body_integrals += general_basis_change(
+                numpy.asarray(mints.ao_potential()), molecule.canonical_orbitals, (1, 0))
+            two_body_integrals = numpy.asarray(mints.ao_eri())
+            two_body_integrals.reshape((molecule.n_orbitals, molecule.n_orbitals,
+                                        molecule.n_orbitals, molecule.n_orbitals))
+            two_body_integrals = numpy.einsum('psqr', two_body_integrals)
+            two_body_integrals = general_basis_change(
+                two_body_integrals, molecule.canonical_orbitals, (1, 1, 0, 0))
+            molecule.two_body_integrals = two_body_integrals
+
+        molecule.save()
 
 # Perform exact diagonalization.
 if &run_fci:
@@ -207,6 +228,26 @@ if &run_fci:
         # Store 1-RDM in molecule file, 2-RDM separately in other file.
         molecule.fci_one_rdm = fci_one_rdm
         molecule.fci_two_rdm = fci_two_rdm
+
+        if &fci_no:
+            # Get integrals using MintsHelper.
+            mints = MintsHelper(hf_wavefunction.basisset())
+            nat_occ, nat_orb = numpy.linalg.eigh(fci_one_rdm_a)
+            nat_occ[::-1].sort()
+            nat_orb = nat_orb[::-1]
+            molecule.canonical_orbitals = molecule.canonical_orbitals @ nat_orb
+            molecule.one_body_integrals = general_basis_change(
+                numpy.asarray(mints.ao_kinetic()), molecule.canonical_orbitals, (1, 0))
+            molecule.one_body_integrals += general_basis_change(
+                numpy.asarray(mints.ao_potential()), molecule.canonical_orbitals, (1, 0))
+            two_body_integrals = numpy.asarray(mints.ao_eri())
+            two_body_integrals.reshape((molecule.n_orbitals, molecule.n_orbitals,
+                                        molecule.n_orbitals, molecule.n_orbitals))
+            two_body_integrals = numpy.einsum('psqr', two_body_integrals)
+            two_body_integrals = general_basis_change(
+                two_body_integrals, molecule.canonical_orbitals, (1, 1, 0, 0))
+            molecule.two_body_integrals = two_body_integrals
+
         molecule.save()
 
 
